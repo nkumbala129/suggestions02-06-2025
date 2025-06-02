@@ -331,15 +331,6 @@ else:
             unsafe_allow_html=True
         )
 
-    # --- Display Welcome Message After Login ---
-    if st.session_state.welcome_displayed:
-        welcome_message = "Hi, I am your PBCS Assistant. I can help you explore data, insights and analytics on PBCS (Planning and Budgeting insight solution)."
-        with st.chat_message("assistant"):
-            st.write_stream(stream_text(welcome_message))
-        if not any(msg["content"] == welcome_message for msg in st.session_state.chat_history):
-            st.session_state.chat_history.append({"role": "assistant", "content": welcome_message})
-        st.session_state.welcome_displayed = False
-
     # --- Main App Logic ---
     session = st.session_state.snowpark_session
     root = Root(session)
@@ -623,14 +614,23 @@ else:
             """
             <div class="fixed-header">
                 <h1 style='color: #29B5E8; margin-bottom: 5px;'>Cortex AI-Procurement Assistant by DiLytics</h1>
-                <p style='font-size: 16px; color: #333;'><strong>Welcome to Cortex AI. I Am here to help with Procrement Data </strong></p>
+                <p style='font-size: 16px; color: #333;'><strong>Welcome to Cortex AI. I Am here to help with Procurement Data </strong></p>
             </div>
             """,
             unsafe_allow_html=True
         )
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
     init_service_metadata()
-        
+
+    # --- Display Welcome Message After Login ---
+    if st.session_state.welcome_displayed and not st.session_state.chat_history:
+        welcome_message = "Hi! I'm your PBCS Assistant, ready to help you dive into data, insights, and analytics for PBCS (Planning and Budgeting Insight Solution). Ask me anything about your procurement data!"
+        with st.chat_message("assistant"):
+            st.write_stream(stream_text(welcome_message))
+        if not any(msg["content"] == welcome_message for msg in st.session_state.chat_history):
+            st.session_state.chat_history.append({"role": "assistant", "content": welcome_message})
+        st.session_state.welcome_displayed = False
+
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
         "What is DiLytics Procurement Insight Solution?",
@@ -665,7 +665,7 @@ else:
             query = sample
 
     if query:
-        st.session_state.welcome_displayed = False  # Hide welcome message after query
+        st.session_state.welcome_displayed = False  # Ensure welcome message doesn't reappear
         st.session_state.chart_x_axis = None
         st.session_state.chart_y_axis = None
         st.session_state.chart_type = "Bar Chart"
@@ -742,7 +742,7 @@ else:
                         results = run_snowflake_query(sql)
                         if results is not None and not results.empty:
                             results_text = results.to_string(index=False)
-                            prompt = f"Provide a concise natural language answer to the query '{query}' using the following data, avoiding phrases like 'Based on the query results':\n\n{ produtor_text}"
+                            prompt = f"Provide a concise natural language answer to the query '{query}' using the following data, avoiding phrases like 'Based on the query results':\n\n{results_text}"
                             summary = complete(st.session_state.model_name, prompt)
                             if not summary:
                                 summary = "Unable to generate a natural language summary."
