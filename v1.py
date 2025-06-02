@@ -604,15 +604,6 @@ else:
                 "- [Contact Support](https://www.snowflake.com/en/support/)"
             )
 
-            # Display welcome message only once, outside of chat history loop
-    if not st.session_state.welcome_displayed:
-        welcome_message = "Hi, I am your PBCS Assistant. I can help you explore data, insights and analytics on PBCS (Planning and Budgeting insight solution)."
-        with st.chat_message("assistant"):
-            st.markdown(welcome_message, unsafe_allow_html=True)
-        # Add to chat_history only if not already present
-        if not any(msg["content"] == welcome_message for msg in st.session_state.chat_history):
-            st.session_state.chat_history.append({"role": "assistant", "content": welcome_message})
-        st.session_state.welcome_displayed = True
     # --- Main UI and Query Processing ---
     with st.container():
         st.markdown(
