@@ -610,7 +610,7 @@ else:
             """
             <div class="fixed-header">
                 <h1 style='color: #29B5E8; margin-bottom: 5px;'>Cortex AI-Procurement Assistant by DiLytics</h1>
-                <p style='font-size: 16px; color: #333;'><strong>Welcome to Cortex AI.</strong></p>
+                <p style='font-size: 16px; color: #333;'><strong>Welcome to Cortex AI. I Am here to help with Procrement Data </strong></p>
             </div>
             """,
             unsafe_allow_html=True
