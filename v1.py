@@ -77,6 +77,13 @@ if "clear_conversation" not in st.session_state:
     st.session_state.clear_conversation = False
 if "rerun_trigger" not in st.session_state:
     st.session_state.rerun_trigger = False
+# Add storage for previous query context
+if "previous_query" not in st.session_state:
+    st.session_state.previous_query = None
+if "previous_sql" not in st.session_state:
+    st.session_state.previous_sql = None
+if "previous_results" not in st.session_state:
+    st.session_state.previous_results = None
 
 # --- CSS Styling ---
 st.markdown("""
@@ -172,6 +179,10 @@ def start_new_conversation():
     st.session_state.last_suggestions = []
     st.session_state.clear_conversation = False
     st.session_state.rerun_trigger = True
+    # Reset previous query context
+    st.session_state.previous_query = None
+    st.session_state.previous_sql = None
+    st.session_state.previous_results = None
 
 # --- Initialize Service Metadata ---
 def init_service_metadata():
@@ -243,6 +254,9 @@ def make_chat_history_summary(chat_history, question):
         Based on the chat history below and the question, generate a query that extends the question
         with the chat history provided. The query should be in natural language and incorporate relevant
         details from the previous responses to ensure context is maintained for follow-up questions.
+        For example:
+        - If the chat history contains "user: Total number of purchase orders?" and the current question is "by department",
+          the resulting query should be "What is the total number of purchase orders by department?"
         Answer with only the query. Do not add any explanation.
 
         <chat_history>
@@ -384,9 +398,17 @@ else:
     def is_greeting_query(query: str):
         greeting_patterns = [
             r'^\b(hello|hi|hey|greet)\b$',
-            r'^\b(hello|hi|hey|greet)\b\s.*$'
+            r'^\b(hello|hi|hey,greet)\b\s.*$'
         ]
         return any(re.search(pattern, query.lower()) for pattern in greeting_patterns)
+
+    # --- Add Follow-Up Query Detection ---
+    def is_follow_up_query(query: str):
+        follow_up_patterns = [
+            r'^\bby\b\s+\w+$',  # e.g., "by department"
+            r'^\bgroup by\b\s+\w+$'  # e.g., "group by department"
+        ]
+        return any(re.search(pattern, query.lower()) for pattern in follow_up_patterns) and st.session_state.previous_query
 
     # --- Cortex Complete Function ---
     def complete(model, prompt):
@@ -703,18 +725,28 @@ else:
                     query = original_query
             except Exception as e:
                 query = original_query
+
+        # Check if this is a follow-up question
+        is_follow_up = is_follow_up_query(query)
+        # If this is a follow-up and chat history is enabled, use the chat history to generate a combined query
+        combined_query = query
+        if st.session_state.use_chat_history and is_follow_up:
+            chat_history = get_chat_history()
+            if chat_history:
+                combined_query = make_chat_history_summary(chat_history, query)
+
         st.session_state.chat_history.append({"role": "user", "content": original_query})
         st.session_state.messages.append({"role": "user", "content": original_query})
         with st.chat_message("user"):
             st.write(original_query)
         with st.chat_message("assistant"):
             with st.spinner("Generating Response..."):
-                is_structured = is_structured_query(query)
-                is_complete = is_complete_query(query)
-                is_summarize = is_summarize_query(query)
-                is_suggestion = is_question_suggestion_query(query)
-                is_greeting = is_greeting_query(query)
-                assistant_response = {"role": "assistant", "content": "", "query": query}
+                is_structured = is_structured_query(combined_query)
+                is_complete = is_complete_query(combined_query)
+                is_summarize = is_summarize_query(combined_query)
+                is_suggestion = is_question_suggestion_query(combined_query)
+                is_greeting = is_greeting_query(combined_query)
+                assistant_response = {"role": "assistant", "content": "", "query": combined_query}
                 response_content = ""
                 failed_response = False
 
@@ -731,7 +763,7 @@ else:
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 elif is_complete:
-                    response = create_prompt(query)
+                    response = create_prompt(combined_query)
                     if response:
                         response_content = response.strip()
                         st.write_stream(stream_text(response_content))
@@ -743,7 +775,7 @@ else:
                         assistant_response["content"] = response_content
 
                 elif is_summarize:
-                    summary = summarize(query)
+                    summary = summarize(combined_query)
                     if summary:
                         response_content = summary.strip()
                         st.write_stream(stream_text(response_content))
@@ -755,13 +787,13 @@ else:
                         assistant_response["content"] = response_content
 
                 elif is_structured:
-                    response = snowflake_api_call(query, is_structured=True)
+                    response = snowflake_api_call(combined_query, is_structured=True)
                     sql, _ = process_sse_response(response, is_structured=True)
                     if sql:
                         results = run_snowflake_query(sql)
                         if results is not None and not results.empty:
                             results_text = results.to_string(index=False)
-                            prompt = f"Provide a concise natural language answer to the query '{query}' using the following data, avoiding phrases like 'Based on the query results':\n\n{results_text}"
+                            prompt = f"Provide a concise natural language answer to the query '{combined_query}' using the following data, avoiding phrases like 'Based on the query results':\n\n{results_text}"
                             summary = complete(st.session_state.model_name, prompt)
                             if not summary:
                                 summary = "Unable to generate a natural language summary."
@@ -773,7 +805,7 @@ else:
                             st.dataframe(results)
                             if len(results.columns) >= 2:
                                 st.write("Visualization:")
-                                display_chart_tab(results, prefix=f"chart_{hash(query)}", query=query)
+                                display_chart_tab(results, prefix=f"chart_{hash(combined_query)}", query=combined_query)
                             assistant_response.update({
                                 "content": response_content,
                                 "sql": sql,
@@ -797,11 +829,11 @@ else:
                         assistant_response["content"] = response_content
 
                 else:
-                    response = snowflake_api_call(query, is_structured=False)
+                    response = snowflake_api_call(combined_query, is_structured=False)
                     _, search_results = process_sse_response(response, is_structured=False)
                     if search_results:
                         raw_result = search_results[0]
-                        summary = create_prompt(query)
+                        summary = create_prompt(combined_query)
                         if summary:
                             response_content = summary.strip()
                             st.write_stream(stream_text(response_content))
@@ -816,7 +848,7 @@ else:
                         assistant_response["content"] = response_content
 
                 if failed_response:
-                    suggestions = suggest_sample_questions(query)
+                    suggestions = suggest_sample_questions(combined_query)
                     response_content = "I'm not sure about your question. Here are some questions you can ask me:\n\n"
                     st.write_stream(stream_text(response_content))
                     display_suggestion_buttons(suggestions)
@@ -825,7 +857,11 @@ else:
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 st.session_state.chat_history.append(assistant_response)
-                st.session_state.current_query = query
+                st.session_state.current_query = combined_query
                 st.session_state.current_results = assistant_response.get("results")
                 st.session_state.current_sql = assistant_response.get("sql")
                 st.session_state.current_summary = assistant_response.get("summary")
+                # Store the previous query context
+                st.session_state.previous_query = combined_query
+                st.session_state.previous_sql = assistant_response.get("sql")
+                st.session_state.previous_results = assistant_response.get("results")
