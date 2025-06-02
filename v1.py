@@ -133,7 +133,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Stream Text Function ---
-def stream_text(text: str, chunk_size: int = 1, delay: float = 0.01):
+def stream_text(text: str, chunk_size: int = 1, delay: float = 0.05):  # Increased delay for slower typing
     for i in range(0, len(text), chunk_size):
         yield text[i:i + chunk_size]
         time.sleep(delay)
@@ -312,6 +312,10 @@ if not st.session_state.authenticated:
                 cur.execute("ALTER SESSION SET TIMEZONE = 'UTC'")
                 cur.execute("ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = TRUE")
             st.session_state.authenticated = True
+            # Add welcome message to chat history directly upon login
+            welcome_message = "Hi! I'm your PBCS Assistant, ready to help you dive into data, insights, and analytics for PBCS (Planning and Budgeting Insight Solution). Ask me anything about your procurement data!"
+            if not any(msg["content"] == welcome_message for msg in st.session_state.chat_history):
+                st.session_state.chat_history.append({"role": "assistant", "content": welcome_message})
             st.session_state.welcome_displayed = True
             st.success("Authentication successful! Redirecting...")
             st.rerun()
@@ -622,15 +626,6 @@ else:
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
     init_service_metadata()
 
-    # --- Display Welcome Message After Login ---
-    if st.session_state.welcome_displayed and not st.session_state.chat_history:
-        welcome_message = "Hi! I'm your PBCS Assistant, ready to help you dive into data, insights, and analytics for PBCS (Planning and Budgeting Insight Solution). Ask me anything about your procurement data!"
-        with st.chat_message("assistant"):
-            st.write_stream(stream_text(welcome_message))
-        if not any(msg["content"] == welcome_message for msg in st.session_state.chat_history):
-            st.session_state.chat_history.append({"role": "assistant", "content": welcome_message})
-        st.session_state.welcome_displayed = False
-
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
         "What is DiLytics Procurement Insight Solution?",
@@ -644,10 +639,11 @@ else:
         "What are the top 5 suppliers based on purchase order amount?"
     ]
 
+    # --- Display Chat History ---
     if st.session_state.chat_history:
         for message in st.session_state.chat_history[-10:]:
             with st.chat_message(message["role"]):
-                st.write(message["content"])
+                st.write_stream(stream_text(message["content"]))  # Use stream_text for all messages
                 if message["role"] == "assistant" and "results" in message and message["results"] is not None:
                     with st.expander("View SQL Query", expanded=False):
                         st.code(message["sql"], language="sql")
