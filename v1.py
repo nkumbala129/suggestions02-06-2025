@@ -9,13 +9,14 @@ from snowflake.core import Root
 from typing import Any, Dict, List, Optional, Tuple
 import plotly.express as px
 import time
+import traceback
 
 # --- Snowflake/Cortex Configuration ---
 HOST = "HLGSIYM-COB42429.snowflakecomputing.com"
 DATABASE = "AI"
 SCHEMA = "DWH_MART"
 API_ENDPOINT = "/api/v2/cortex/agent:run"
-API_TIMEOUT = 50000  # in milliseconds
+API_TIMEOUT = 50000
 CORTEX_SEARCH_SERVICES = "PROC_SERVICE"
 SEMANTIC_MODEL = '@"AI"."DWH_MART"."PROCUREMENT_SEARCH"/procurement.yaml'
 
@@ -161,6 +162,8 @@ def init_service_metadata():
     st.session_state.service_metadata = [{"name": "PROC_SERVICE", "search_column": ""}]
     st.session_state.selected_cortex_search_service = "PROC_SERVICE"
     try:
+        if not session:
+            raise ValueError("Snowflake session is not initialized.")
         svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE PROC_SERVICE;").collect()[0]["search_column"]
         st.session_state.service_metadata = [{"name": "PROC_SERVICE", "search_column": svc_search_col}]
     except Exception as e:
@@ -192,8 +195,19 @@ def init_config_options():
 # --- Query Cortex Search Service ---
 @st.cache_data
 def query_cortex_search_service(query):
+    if not query or not isinstance(query, str):
+        st.error(f"❌ Invalid query provided to Cortex Search service: {query}")
+        return ""
+    
     try:
+        if not session:
+            raise ValueError("Snowflake session is not initialized.")
+        
+        st.write(f"Debug: Querying Cortex Search service with query: {query}")
         db, schema = session.get_current_database(), session.get_current_schema()
+        if not db or not schema:
+            raise ValueError("Database or schema not set in the session.")
+        
         root = Root(session)
         cortex_search_service = (
             root.databases[db]
@@ -206,12 +220,15 @@ def query_cortex_search_service(query):
         results = context_documents.results
         service_metadata = st.session_state.service_metadata
         search_col = service_metadata[0]["search_column"]
+        if not search_col:
+            raise ValueError("Search column not found in service metadata.")
+        
         context_str = ""
         for i, r in enumerate(results):
             context_str += f"Context document {i+1}: {r[search_col]} \n" + "\n"
         return context_str
     except Exception as e:
-        st.error(f"❌ Error querying Cortex Search service: {str(e)}")
+        st.error(f"❌ Error querying Cortex Search service: {str(e)}\nStack trace: {traceback.format_exc()}")
         return ""
 
 # --- Get Chat History ---
@@ -243,11 +260,18 @@ def make_chat_history_summary(chat_history, question):
 
 # --- Create Prompt ---
 def create_prompt(user_question):
+    if not user_question or not isinstance(user_question, str):
+        st.error(f"❌ Invalid user question: {user_question}")
+        return complete(st.session_state.model_name, user_question if user_question else "Default query")
+
     chat_history_str = ""
     if st.session_state.use_chat_history:
         chat_history = get_chat_history()
         if chat_history:
             question_summary = make_chat_history_summary(chat_history, user_question)
+            if not question_summary:
+                st.warning("Chat history summary could not be generated. Proceeding with original question.")
+                question_summary = user_question
             prompt_context = query_cortex_search_service(question_summary)
             chat_history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
         else:
@@ -314,7 +338,6 @@ if not st.session_state.authenticated:
                 cur.execute("ALTER SESSION SET TIMEZONE = 'UTC'")
                 cur.execute("ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = TRUE")
             st.session_state.authenticated = True
-            # Add welcome message to chat history directly upon login
             welcome_message = "Hi! I'm your PBCS Assistant, ready to help you dive into data, insights, and analytics for PBCS (Planning and Budgeting Insight Solution). Ask me anything about your procurement data!"
             if not any(msg["content"] == welcome_message for msg in st.session_state.chat_history):
                 st.session_state.chat_history.append({"role": "assistant", "content": welcome_message})
@@ -324,7 +347,6 @@ if not st.session_state.authenticated:
         except Exception as e:
             st.error(f"Authentication failed: {e}")
 else:
-    # --- Add Logo in Sidebar ---
     with st.sidebar:
         st.markdown(
             f"""
@@ -337,11 +359,13 @@ else:
             unsafe_allow_html=True
         )
 
-    # --- Main App Logic ---
     session = st.session_state.snowpark_session
+    if not session:
+        st.error("❌ Snowflake session is not initialized. Please log in again.")
+        st.stop()
+
     root = Root(session)
 
-    # --- Run Snowflake Query ---
     @st.cache_data
     def run_snowflake_query(query):
         try:
@@ -358,7 +382,6 @@ else:
             st.error(f"❌ SQL Execution Error: {str(e)}")
             return None
 
-    # --- Query Classification Functions ---
     def is_structured_query(query: str):
         structured_patterns = [
             r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list|names?|are there any|rejected deliveries?|least|highest|duration|approval)\b',
@@ -388,7 +411,6 @@ else:
         ]
         return any(re.search(pattern, query.lower()) for pattern in greeting_patterns)
 
-    # --- Cortex Complete Function ---
     def complete(model, prompt):
         try:
             prompt = prompt.replace("'", "\\'")
@@ -399,7 +421,6 @@ else:
             st.error(f"❌ COMPLETE Function Error: {str(e)}")
             return None
 
-    # --- Summarize Function ---
     def summarize(text):
         try:
             text = text.replace("'", "\\'")
@@ -410,7 +431,6 @@ else:
             st.error(f"❌ SUMMARIZE Function Error: {str(e)}")
             return None
 
-    # --- Parse SSE Response ---
     def parse_sse_response(response_text: str) -> List[Dict]:
         events = []
         lines = response_text.strip().split("\n")
@@ -430,7 +450,6 @@ else:
                         st.error(f"❌ Failed to parse SSE data: {str(e)} - Data: {data_str}")
         return events
 
-    # --- Process SSE Response ---
     def process_sse_response(response, is_structured):
         sql = ""
         search_results = []
@@ -456,7 +475,6 @@ else:
             st.error(f"❌ Error Processing Response: {str(e)}")
         return sql.strip(), search_results
 
-    # --- Snowflake API Call ---
     def snowflake_api_call(query: str, is_structured: bool = False):
         payload = {
             "model": st.session_state.model_name,
@@ -490,12 +508,10 @@ else:
             st.error(f"❌ API Request Error: {str(e)}")
             return None
 
-    # --- Summarize Unstructured Answer ---
     def summarize_unstructured_answer(answer):
         sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|")\s', answer)
         return "\n".join(f"- {sent.strip()}" for sent in sentences[:6])
 
-    # --- Suggest Sample Questions ---
     def suggest_sample_questions(query: str) -> List[str]:
         try:
             prompt = (
@@ -531,11 +547,9 @@ else:
                 "Which requisitions have been pending approval for more than a week?"
             ]
 
-    # --- Display DataFrame ---
     def display_dataframe(df: pd.DataFrame, key: str):
         st.dataframe(df, use_container_width=True, key=key)
 
-    # --- Display Chart Function ---
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
         if df.empty or len(df.columns) < 2:
             return
@@ -560,7 +574,7 @@ else:
         type_index = chart_options.index(default_type) if default_type in chart_options else 0
         chart_type = col3.selectbox("Chart Type", chart_options, index=type_index, key=f"{prefix}_chart_type")
         chart_key = f"{prefix}_chart_{hash(query)}"
-        if y_col:  # Only render chart if y_col is valid
+        if y_col:
             if chart_type == "Line Chart":
                 fig = px.line(df, x=x_col, y=y_col, title=chart_type)
                 st.plotly_chart(fig, key=chart_key, use_container_width=True)
@@ -574,7 +588,6 @@ else:
                 fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
                 st.plotly_chart(fig, key=chart_key, use_container_width=True)
 
-    # --- Sidebar UI ---
     with st.sidebar:
         st.markdown("""
         <style>
@@ -614,7 +627,6 @@ else:
                 "- [Contact Support](https://www.snowflake.com/en/support/)"
             )
 
-    # --- Main UI and Query Processing ---
     with st.container():
         st.markdown(
             """
@@ -641,11 +653,9 @@ else:
         "What are the top 5 suppliers based on purchase order amount?"
     ]
 
-    # --- Display Chat History ---
     if st.session_state.chat_history:
         for message in st.session_state.chat_history[-10:]:
             with st.chat_message(message["role"]):
-                # Use markdown to ensure proper text rendering
                 st.markdown(message["content"])
                 if message["role"] == "assistant" and "results" in message and message["results"] is not None:
                     with st.expander("View SQL Query", expanded=False):
