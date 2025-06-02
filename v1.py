@@ -79,6 +79,8 @@ if "show_sample_questions" not in st.session_state:
     st.session_state.show_sample_questions = False
 if "show_history" not in st.session_state:
     st.session_state.show_history = False
+if "logo_rendered" not in st.session_state:
+    st.session_state.logo_rendered = False
 
 # --- CSS Styling ---
 st.markdown("""
@@ -106,10 +108,14 @@ st.markdown("""
     position: fixed;
     top: 10px;
     right: 10px;
-    z-index: 1000;
+    z-index: 1001; /* Higher than header to ensure visibility */
     width: 150px;
     height: auto;
-    pointer-events: none; /* Prevent interaction to avoid re-rendering */
+    pointer-events: none; /* Prevent interactions */
+    image-rendering: optimizeSpeed; /* Optimize for fast rendering */
+    -webkit-backface-visibility: hidden; /* Prevent flickering in some browsers */
+    -moz-backface-visibility: hidden;
+    backface-visibility: hidden;
 }
 .fixed-header {
     position: fixed;
@@ -135,11 +141,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Add Logo in Fixed Position ---
-# Render the logo at the top of the app, outside any conditional blocks, to prevent re-rendering
-st.markdown(
-    f'<img src="https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png" class="dilytics-logo">',
-    unsafe_allow_html=True
-)
+# Render the logo only once using a dedicated container
+if not st.session_state.logo_rendered:
+    with st.container():
+        st.markdown(
+            '<img src="https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png" class="dilytics-logo">',
+            unsafe_allow_html=True
+        )
+    st.session_state.logo_rendered = True
 
 # --- Stream Text Function ---
 def stream_text(text: str, chunk_size: int = 1, delay: float = 0.01):
@@ -294,7 +303,7 @@ def create_prompt(user_question):
 
 # --- Authentication Logic ---
 if not st.session_state.authenticated:
-    st.title("Welcome to Snowflake Cortex AI")
+    st聦st.title("Welcome to Snowflake Cortex AI")
     st.write("Please login to interact with your data")
     st.session_state.username = st.text_input("Enter Snowflake Username:", value=st.session_state.username)
     st.session_state.password = st.text_input("Enter Password:", type="password")
