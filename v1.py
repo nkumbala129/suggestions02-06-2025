@@ -124,7 +124,7 @@ st.markdown("""
     cursor: default !important;
 }
 .stApp {
-    padding-top: 100px;
+    padding-top: 120px;
 }
 </style>
 """, unsafe_allow_html=True)
