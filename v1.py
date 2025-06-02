@@ -114,8 +114,9 @@ st.markdown("""
     padding: 10px;
     text-align: center;
     pointer-events: none;
-    max-width: 100%; /* Adjusted header width */
-    margin: 0 auto; /* Center the header */
+    max-width: 80%;
+    margin: 0 auto;
+    height: 80px; /* Fixed height to prevent overlap */
 }
 .fixed-header a {
     pointer-events: none !important;
@@ -124,7 +125,7 @@ st.markdown("""
     cursor: default !important;
 }
 .stApp {
-    padding-top: 120px;
+    padding-top: 120px; /* Increased padding to avoid overlap with header */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -522,6 +523,11 @@ else:
                 "Which requisitions have been pending approval for more than a week?"
             ]
 
+    # --- Cache DataFrame Display ---
+    @st.cache_data
+    def display_dataframe(df: pd.DataFrame, key: str):
+        st.dataframe(df, key=key)
+
     # --- Display Chart Function ---
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
         if df.empty or len(df.columns) < 2:
@@ -539,14 +545,14 @@ else:
         x_index = all_cols.index(default_x) if default_x in all_cols else 0
         x_col = col1.selectbox("X axis", all_cols, index=x_index, key=f"{prefix}_x")
         remaining_cols = [c for c in all_cols if c != x_col]
-        default_y = st.session_state.get(f"{prefix}_y", remaining_cols[0] if remaining_cols else all_cols[0])
+        default_y = st.session_state.get(f"{prefix}_y", remaining_cols[0] if remaining_cols else '')
         y_index = remaining_cols.index(default_y) if default_y in remaining_cols else 0
         y_col = col2.selectbox("Y axis", remaining_cols, index=y_index, key=f"{prefix}_y")
-        chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
+        chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart"]
         default_type = st.session_state.get(f"{prefix}_type", default_chart)
         type_index = chart_options.index(default_type) if default_type in chart_options else chart_options.index(default_chart)
-        chart_type = col3.selectbox("Chart Type", chart_options, index=type_index, key=f"{prefix}_type")
-        chart_key = f"{prefix}_{chart_type}_{hash(query)}"
+        chart_type = col3.selectbox("Chart Type", chart_options, index=type_index, key=f"{prefix}_chart_type")
+        chart_key = f"{prefix}_chart_{hash(query)}_{chart_type}"
         if chart_type == "Line Chart":
             fig = px.line(df, x=x_col, y=y_col, title=chart_type)
             st.plotly_chart(fig, key=chart_key)
@@ -558,9 +564,6 @@ else:
             st.plotly_chart(fig, key=chart_key)
         elif chart_type == "Scatter Chart":
             fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
-            st.plotly_chart(fig, key=chart_key)
-        elif chart_type == "Histogram Chart":
-            fig = px.histogram(df, x=x_col, title=chart_type)
             st.plotly_chart(fig, key=chart_key)
 
     # --- Sidebar UI ---
@@ -578,7 +581,7 @@ else:
             padding: 0.5rem 1rem !important;
         }
         </style>
-        """, unsafe_allow_html=True)
+        """, unsafe_delegate_html=True)
         logo_container = st.container()
         button_container = st.container()
         about_container = st.container()
@@ -609,7 +612,7 @@ else:
             """
             <div class="fixed-header">
                 <h1 style='color: #29B5E8; margin-bottom: 5px;'>   Cortex AI-Procurement Assistant by DiLytics</h1>
-                <p style='font-size: 16px; color: #333;'><strong>Welcome to Cortex AI. I am here to help with Dilytics Procurement Insights Solutions</strong></p>
+                <p style='font-size: 16px; color: #333;'><strong>Welcome to Cortex AI.</strong></p>
             </div>
             """,
             unsafe_allow_html=True
@@ -638,14 +641,14 @@ else:
                     with st.expander("View SQL Query", expanded=False):
                         st.code(message["sql"], language="sql")
                     st.write(f"Query Results ({len(message['results'])} rows):")
-                    st.dataframe(message["results"], key=f"df_{hash(message['content'])}")
+                    display_dataframe(message["results"], key=f"df_{hash(message['content'])}")
                     if not message["results"].empty and len(message["results"].columns) >= 2:
                         st.write("Visualization:")
-                        display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
+                        display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("content", ""))
 
     query = st.chat_input("Ask your question...")
-    if query and query.lower().startswith("no of"):
-        query = query.replace("no of", "number of", 1)
+    if query and query.lower().startswith("sql"):
+        query = query.replace("sql", "number of", 1)
     for sample in sample_questions:
         if st.sidebar.button(sample, key=f"sample_{sample}"):
             query = sample
@@ -653,7 +656,7 @@ else:
     if query:
         st.session_state.chart_x_axis = None
         st.session_state.chart_y_axis = None
-        st.session_state.chart_type = "Bar Chart"
+        st.session_state.chart_type = None
         original_query = query
         selected_question = None
         if query.strip().isdigit() and st.session_state.last_suggestions:
@@ -736,7 +739,7 @@ else:
                             with st.expander("View SQL Query", expanded=False):
                                 st.code(sql, language="sql")
                             st.write(f"Query Results ({len(results)} rows):")
-                            st.dataframe(results, key=f"df_{hash(query)}")
+                            display_dataframe(results, key=f"df_{hash(query)}")
                             if len(results.columns) >= 2:
                                 st.write("Visualization:")
                                 display_chart_tab(results, prefix=f"chart_{hash(query)}", query=query)
@@ -782,7 +785,7 @@ else:
                         assistant_response["content"] = response_content
 
                 if failed_response:
-                    suggestions = suggest_sample_questions(query)
+                    suggestions = []
                     response_content = "I'm not sure about your question. Here are some questions you can ask me:\n\n"
                     for i, suggestion in enumerate(suggestions, 1):
                         response_content += f"{i}. {suggestion}\n"
