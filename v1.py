@@ -1,6 +1,7 @@
 # Import necessary libraries for Streamlit UI, JSON handling, regex, HTTP requests,
 # Snowflake connectivity, pandas for data manipulation, Plotly for visualizations, and typing.
 import streamlit as st
+import streamlit.components.v1 as components
 import json
 import re
 import requests
@@ -310,10 +311,11 @@ if not st.session_state.authenticated:
             st.error(f"Authentication failed: {e}")
 else:
     # --- Add Logo in the Main UI ---
-    # Moved to top of authenticated section to prevent flickering
-    st.markdown(
-        f'<img src="https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png" class="dilytics-logo">',
-        unsafe_allow_html=True
+    # Use components.html to prevent flickering
+    components.html(
+        f'<div><img src="https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png" class="dilytics-logo"></div>',
+        height=100,
+        key="dilytics_logo"
     )
 
     # --- Main App Logic ---
