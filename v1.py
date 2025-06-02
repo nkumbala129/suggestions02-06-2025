@@ -312,6 +312,7 @@ if not st.session_state.authenticated:
                 cur.execute("ALTER SESSION SET TIMEZONE = 'UTC'")
                 cur.execute("ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = TRUE")
             st.session_state.authenticated = True
+            st.session_state.welcome_displayed = True
             st.success("Authentication successful! Redirecting...")
             st.rerun()
         except Exception as e:
@@ -329,6 +330,15 @@ else:
             """,
             unsafe_allow_html=True
         )
+
+    # --- Display Welcome Message After Login ---
+    if st.session_state.welcome_displayed:
+        welcome_message = "Hi, I am your PBCS Assistant. I can help you explore data, insights and analytics on PBCS (Planning and Budgeting insight solution)."
+        with st.chat_message("assistant"):
+            st.write_stream(stream_text(welcome_message))
+        if not any(msg["content"] == welcome_message for msg in st.session_state.chat_history):
+            st.session_state.chat_history.append({"role": "assistant", "content": welcome_message})
+        st.session_state.welcome_displayed = False
 
     # --- Main App Logic ---
     session = st.session_state.snowpark_session
@@ -621,16 +631,6 @@ else:
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
     init_service_metadata()
         
-    # Display welcome message only once, outside of chat history loop
-    if not st.session_state.welcome_displayed:
-        welcome_message = "Hi, I am your PBCS Assistant. I can help you explore data, insights and analytics on PBCS (Planning and Budgeting insight solution)."
-        with st.chat_message("assistant"):
-            st.markdown(welcome_message, unsafe_allow_html=True)
-        # Add to chat_history only if not already present
-        if not any(msg["content"] == welcome_message for msg in st.session_state.chat_history):
-            st.session_state.chat_history.append({"role": "assistant", "content": welcome_message})
-        st.session_state.welcome_displayed = True
-
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
         "What is DiLytics Procurement Insight Solution?",
@@ -665,6 +665,7 @@ else:
             query = sample
 
     if query:
+        st.session_state.welcome_displayed = False  # Hide welcome message after query
         st.session_state.chart_x_axis = None
         st.session_state.chart_y_axis = None
         st.session_state.chart_type = "Bar Chart"
@@ -741,7 +742,7 @@ else:
                         results = run_snowflake_query(sql)
                         if results is not None and not results.empty:
                             results_text = results.to_string(index=False)
-                            prompt = f"Provide a concise natural language answer to the query '{query}' using the following data, avoiding phrases like 'Based on the query results':\n\n{results_text}"
+                            prompt = f"Provide a concise natural language answer to the query '{query}' using the following data, avoiding phrases like 'Based on the query results':\n\n{ produtor_text}"
                             summary = complete(st.session_state.model_name, prompt)
                             if not summary:
                                 summary = "Unable to generate a natural language summary."
