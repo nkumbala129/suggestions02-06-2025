@@ -1,5 +1,3 @@
-# Import necessary libraries for Streamlit UI, JSON handling, regex, HTTP requests,
-# Snowflake connectivity, pandas for data manipulation, Plotly for visualizations, and typing.
 import streamlit as st
 import json
 import re
@@ -13,8 +11,6 @@ import plotly.express as px
 import time
 
 # --- Snowflake/Cortex Configuration ---
-# Define constants for Snowflake connection and Cortex API settings.
-# These specify the host, database, schema, API endpoint, and semantic model for procurement data.
 HOST = "HLGSIYM-COB42429.snowflakecomputing.com"
 DATABASE = "AI"
 SCHEMA = "DWH_MART"
@@ -24,7 +20,6 @@ CORTEX_SEARCH_SERVICES = "PROC_SERVICE"
 SEMANTIC_MODEL = '@"AI"."DWH_MART"."PROCUREMENT_SEARCH"/procurement.yaml'
 
 # --- Model Options ---
-# List available Cortex language models for user selection.
 MODELS = [
     "mistral-large",
     "snowflake-arctic",
@@ -33,7 +28,6 @@ MODELS = [
 ]
 
 # --- Streamlit Page Config ---
-# Configure Streamlit app with title, wide layout, and auto sidebar.
 st.set_page_config(
     page_title="Welcome to Cortex AI Assistant",
     layout="wide",
@@ -41,7 +35,6 @@ st.set_page_config(
 )
 
 # --- Session State Initialization ---
-# Initialize session state to manage authentication, connections, chat history, and app settings.
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
     st.session_state.username = ""
@@ -80,8 +73,6 @@ if "use_chat_history" not in st.session_state:
     st.session_state.use_chat_history = True
 if "clear_conversation" not in st.session_state:
     st.session_state.clear_conversation = False
-if "rerun_trigger" not in st.session_state:
-    st.session_state.rerun_trigger = False
 
 # --- CSS Styling ---
 st.markdown("""
@@ -122,7 +113,7 @@ st.markdown("""
     background-color: #ffffff;
     padding: 10px;
     text-align: center;
-    pointer-events: none; /* Disable hover interactions */
+    pointer-events: none;
 }
 .fixed-header a {
     pointer-events: none !important;
@@ -137,23 +128,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Add Logo in the Main UI ---
-# Place the logo at the start of the main UI section to ensure it appears in the chat area
 if st.session_state.authenticated:
-    # Place the logo image using markdown with the custom class
     st.markdown(
         f'<img src="https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png" class="dilytics-logo">',
         unsafe_allow_html=True
     )
 
 # --- Stream Text Function ---
-# Stream text output in chunks with a delay for a typewriter effect.
 def stream_text(text: str, chunk_size: int = 1, delay: float = 0.01):
     for i in range(0, len(text), chunk_size):
         yield text[i:i + chunk_size]
         time.sleep(delay)
 
 # --- Start New Conversation ---
-# Reset session state to clear chat history, query results, and chart settings for a new conversation.
 def start_new_conversation():
     st.session_state.chat_history = []
     st.session_state.messages = []
@@ -166,10 +153,9 @@ def start_new_conversation():
     st.session_state.chart_type = "Bar Chart"
     st.session_state.last_suggestions = []
     st.session_state.clear_conversation = False
-    st.session_state.rerun_trigger = True
 
 # --- Initialize Service Metadata ---
-# Fetch and store metadata for the Cortex search service, including the search column.
+@st.cache_data
 def init_service_metadata():
     st.session_state.service_metadata = [{"name": "PROC_SERVICE", "search_column": ""}]
     st.session_state.selected_cortex_search_service = "PROC_SERVICE"
@@ -180,29 +166,30 @@ def init_service_metadata():
         st.error(f"❌ Failed to verify PROC_SERVICE: {str(e)}. Using default configuration.")
 
 # --- Initialize Config Options ---
-# Set up sidebar controls for clearing conversations and configuring model and context settings.
 def init_config_options():
-    st.sidebar.button("Clear conversation", on_click=start_new_conversation)
-    st.sidebar.toggle("Use chat history", key="use_chat_history", value=True)
-    with st.sidebar.expander("Advanced options"):
-        st.selectbox("Select model:", MODELS, key="model_name")
-        st.number_input(
-            "Select number of context chunks",
-            value=100,
-            key="num_retrieved_chunks",
-            min_value=1,
-            max_value=400
-        )
-        st.number_input(
-            "Select number of messages to use in chat history",
-            value=10,
-            key="num_chat_messages",
-            min_value=1,
-            max_value=100
-        )
+    with st.sidebar.form(key="config_form"):
+        st.button("Clear conversation", on_click=start_new_conversation)
+        st.toggle("Use chat history", key="use_chat_history", value=True)
+        with st.expander("Advanced options"):
+            st.selectbox("Select model:", MODELS, key="model_name")
+            st.number_input(
+                "Select number of context chunks",
+                value=100,
+                key="num_retrieved_chunks",
+                min_value=1,
+                max_value=400
+            )
+            st.number_input(
+                "Select number of messages to use in chat history",
+                value=10,
+                key="num_chat_messages",
+                min_value=1,
+                max_value=100
+            )
+        st.form_submit_button("Apply Settings")
 
 # --- Query Cortex Search Service ---
-# Query the Cortex search service to retrieve relevant procurement data context for a given query.
+@st.cache_data
 def query_cortex_search_service(query):
     try:
         db, schema = session.get_current_database(), session.get_current_schema()
@@ -227,7 +214,6 @@ def query_cortex_search_service(query):
         return ""
 
 # --- Get Chat History ---
-# Retrieve recent chat history based on user-specified message limits.
 def get_chat_history():
     start_index = max(
         0, len(st.session_state.chat_history) - st.session_state.num_chat_messages
@@ -235,7 +221,6 @@ def get_chat_history():
     return st.session_state.chat_history[start_index : len(st.session_state.chat_history) - 1]
 
 # --- Make Chat History Summary ---
-# Summarize chat history and current question into a single query using Cortex.
 def make_chat_history_summary(chat_history, question):
     chat_history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
     prompt = f"""
@@ -256,7 +241,6 @@ def make_chat_history_summary(chat_history, question):
     return summary
 
 # --- Create Prompt ---
-# Construct a prompt for Cortex, combining chat history and search service context if applicable.
 def create_prompt(user_question):
     chat_history_str = ""
     if st.session_state.use_chat_history:
@@ -300,7 +284,6 @@ def create_prompt(user_question):
     return complete(st.session_state.model_name, prompt)
 
 # --- Authentication Logic ---
-# Handle user authentication with Snowflake and set up Snowpark session on success.
 if not st.session_state.authenticated:
     st.title("Welcome to Snowflake Cortex AI")
     st.write("Please login to interact with your data")
@@ -336,16 +319,11 @@ if not st.session_state.authenticated:
             st.error(f"Authentication failed: {e}")
 else:
     # --- Main App Logic ---
-    # Initialize Snowpark session and Root object for authenticated users.
     session = st.session_state.snowpark_session
     root = Root(session)
 
-    if st.session_state.rerun_trigger:
-        st.session_state.rerun_trigger = False
-        st.rerun()
-
     # --- Run Snowflake Query ---
-    # Execute a SQL query and return results as a pandas DataFrame.
+    @st.cache_data
     def run_snowflake_query(query):
         try:
             if not query:
@@ -362,7 +340,6 @@ else:
             return None
 
     # --- Query Classification Functions ---
-    # Classify queries as structured, complete, summarize, suggestion, or greeting using regex.
     def is_structured_query(query: str):
         structured_patterns = [
             r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list|names?|are there any|rejected deliveries?|least|highest|duration|approval)\b',
@@ -393,7 +370,6 @@ else:
         return any(re.search(pattern, query.lower()) for pattern in greeting_patterns)
 
     # --- Cortex Complete Function ---
-    # Call Cortex COMPLETE function to generate a response for a given prompt.
     def complete(model, prompt):
         try:
             prompt = prompt.replace("'", "\\'")
@@ -405,7 +381,6 @@ else:
             return None
 
     # --- Summarize Function ---
-    # Call Cortex SUMMARIZE function to condense text input.
     def summarize(text):
         try:
             text = text.replace("'", "\\'")
@@ -417,7 +392,6 @@ else:
             return None
 
     # --- Parse SSE Response ---
-    # Parse Server-Sent Events (SSE) responses from Cortex API into a list of events.
     def parse_sse_response(response_text: str) -> List[Dict]:
         events = []
         lines = response_text.strip().split("\n")
@@ -438,7 +412,6 @@ else:
         return events
 
     # --- Process SSE Response ---
-    # Extract SQL or search results from SSE responses based on query type.
     def process_sse_response(response, is_structured):
         sql = ""
         search_results = []
@@ -465,7 +438,6 @@ else:
         return sql.strip(), search_results
 
     # --- Snowflake API Call ---
-    # Make HTTP request to Cortex API for structured or unstructured queries.
     def snowflake_api_call(query: str, is_structured: bool = False):
         payload = {
             "model": st.session_state.model_name,
@@ -500,13 +472,11 @@ else:
             return None
 
     # --- Summarize Unstructured Answer ---
-    # Summarize unstructured responses into concise bullet points.
     def summarize_unstructured_answer(answer):
         sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|")\s', answer)
         return "\n".join(f"- {sent.strip()}" for sent in sentences[:6])
 
     # --- Suggest Sample Questions ---
-    # Generate sample procurement-related questions when a query fails or is ambiguous.
     def suggest_sample_questions(query: str) -> List[str]:
         try:
             prompt = (
@@ -543,12 +513,10 @@ else:
             ]
 
     # --- Display Chart Function ---
-    # Function to display charts using Plotly
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
         if df.empty or len(df.columns) < 2:
             return
         query_lower = query.lower()
-        # Determine default chart type based on query content
         if re.search(r'\b(county|jurisdiction)\b', query_lower):
             default_chart = "Pie Chart"
         elif re.search(r'\b(month|year|date)\b', query_lower):
@@ -558,47 +526,34 @@ else:
         all_cols = list(df.columns)
         col1, col2, col3 = st.columns(3)
         default_x = st.session_state.get(f"{prefix}_x", all_cols[0])
-        try:
-            x_index = all_cols.index(default_x)
-        except ValueError:
-            x_index = 0
-        # Select X-axis column
+        x_index = all_cols.index(default_x) if default_x in all_cols else 0
         x_col = col1.selectbox("X axis", all_cols, index=x_index, key=f"{prefix}_x")
         remaining_cols = [c for c in all_cols if c != x_col]
-        default_y = st.session_state.get(f"{prefix}_y", remaining_cols[0])
-        try:
-            y_index = remaining_cols.index(default_y)
-        except ValueError:
-            y_index = 0
-        # Select Y-axis column
+        default_y = st.session_state.get(f"{prefix}_y", remaining_cols[0] if remaining_cols else all_cols[0])
+        y_index = remaining_cols.index(default_y) if default_y in remaining_cols else 0
         y_col = col2.selectbox("Y axis", remaining_cols, index=y_index, key=f"{prefix}_y")
         chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
         default_type = st.session_state.get(f"{prefix}_type", default_chart)
-        try:
-            type_index = chart_options.index(default_type)
-        except ValueError:
-            type_index = chart_options.index(default_chart)
-        # Select chart type
+        type_index = chart_options.index(default_type) if default_type in chart_options else chart_options.index(default_chart)
         chart_type = col3.selectbox("Chart Type", chart_options, index=type_index, key=f"{prefix}_type")
-        # Render chart based on selected type
+        chart_key = f"{prefix}_{chart_type}_{hash(query)}"
         if chart_type == "Line Chart":
             fig = px.line(df, x=x_col, y=y_col, title=chart_type)
-            st.plotly_chart(fig, key=f"{prefix}_line")
+            st.plotly_chart(fig, key=chart_key)
         elif chart_type == "Bar Chart":
             fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
-            st.plotly_chart(fig, key=f"{prefix}_bar")
+            st.plotly_chart(fig, key=chart_key)
         elif chart_type == "Pie Chart":
             fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
-            st.plotly_chart(fig, key=f"{prefix}_pie")
+            st.plotly_chart(fig, key=chart_key)
         elif chart_type == "Scatter Chart":
             fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
-            st.plotly_chart(fig, key=f"{prefix}_scatter")
+            st.plotly_chart(fig, key=chart_key)
         elif chart_type == "Histogram Chart":
             fig = px.histogram(df, x=x_col, title=chart_type)
-            st.plotly_chart(fig, key=f"{prefix}_hist")
+            st.plotly_chart(fig, key=chart_key)
 
     # --- Sidebar UI ---
-    # Set up sidebar with logo, configuration options, about section, and help links.
     with st.sidebar:
         st.markdown("""
         <style>
@@ -639,7 +594,6 @@ else:
             )
 
     # --- Main UI and Query Processing ---
-    # Set up main interface with fixed header, semantic model display, and chat input.
     with st.container():
         st.markdown(
             """
@@ -653,7 +607,6 @@ else:
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
     init_service_metadata()
 
-    # Define sample questions for sidebar buttons.
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
         "What is DiLytics Procurement Insight Solution?",
@@ -667,20 +620,19 @@ else:
         "What are the top 5 suppliers based on purchase order amount?"
     ]
 
-    # Display chat history with results and visualizations.
-    for message in st.session_state.chat_history:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-            if message["role"] == "assistant" and "results" in message and message["results"] is not None:
-                with st.expander("View SQL Query", expanded=False):
-                    st.code(message["sql"], language="sql")
-                st.write(f"Query Results ({len(message['results'])} rows):")
-                st.dataframe(message["results"])
-                if not message["results"].empty and len(message["results"].columns) >= 2:
-                    st.write("Visualization:")
-                    display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
+    if st.session_state.chat_history:
+        for message in st.session_state.chat_history[-10:]:
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
+                if message["role"] == "assistant" and "results" in message and message["results"] is not None:
+                    with st.expander("View SQL Query", expanded=False):
+                        st.code(message["sql"], language="sql")
+                    st.write(f"Query Results ({len(message['results'])} rows):")
+                    st.dataframe(message["results"], key=f"df_{hash(message['content'])}")
+                    if not message["results"].empty and len(message["results"].columns) >= 2:
+                        st.write("Visualization:")
+                        display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
 
-    # Handle user query input and sample question buttons.
     query = st.chat_input("Ask your question...")
     if query and query.lower().startswith("no of"):
         query = query.replace("no of", "number of", 1)
@@ -688,7 +640,6 @@ else:
         if st.sidebar.button(sample, key=f"sample_{sample}"):
             query = sample
 
-    # Process user query based on its type and display results.
     if query:
         st.session_state.chart_x_axis = None
         st.session_state.chart_y_axis = None
@@ -704,7 +655,7 @@ else:
                 else:
                     st.warning(f"Invalid selection: {query}. Please choose a number between 1 and {len(st.session_state.last_suggestions)}.")
                     query = original_query
-            except Exception as e:
+            except Exception:
                 query = original_query
         st.session_state.chat_history.append({"role": "user", "content": original_query})
         st.session_state.messages.append({"role": "user", "content": original_query})
@@ -775,7 +726,7 @@ else:
                             with st.expander("View SQL Query", expanded=False):
                                 st.code(sql, language="sql")
                             st.write(f"Query Results ({len(results)} rows):")
-                            st.dataframe(results)
+                            st.dataframe(results, key=f"df_{hash(query)}")
                             if len(results.columns) >= 2:
                                 st.write("Visualization:")
                                 display_chart_tab(results, prefix=f"chart_{hash(query)}", query=query)
