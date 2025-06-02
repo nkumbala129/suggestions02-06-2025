@@ -658,7 +658,7 @@ else:
         st.markdown("---")
         with sample_questions_container:
             with st.expander("Sample Questions", expanded=st.session_state.show_sample_questions):
-                st.session_state.show_sample_questions = True
+                # st.session_state.show_sample_questions = True
                 sample_questions = [
                     "What is DiLytics Procurement Insight Solution?",
                     "What are the key subject areas covered in the solution?",
@@ -675,7 +675,7 @@ else:
                         st.session_state.current_query = sample
         with history_container:
             with st.expander("History", expanded=st.session_state.show_history):
-                st.session_state.show_history = True
+                # st.session_state.show_history = True
                 st.markdown("### Recent Questions")
                 user_questions = get_user_questions(limit=10)
                 if not user_questions:
