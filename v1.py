@@ -127,13 +127,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Add Logo in the Main UI ---
-if st.session_state.authenticated:
-    st.markdown(
-        f'<img src="https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png" class="dilytics-logo">',
-        unsafe_allow_html=True
-    )
-
 # --- Stream Text Function ---
 def stream_text(text: str, chunk_size: int = 1, delay: float = 0.01):
     for i in range(0, len(text), chunk_size):
@@ -319,6 +312,20 @@ if not st.session_state.authenticated:
         except Exception as e:
             st.error(f"Authentication failed: {e}")
 else:
+    # --- Add Logo in Sidebar ---
+    with st.sidebar:
+        st.markdown(
+            f"""
+            <script>
+                // Preload the image to avoid flickering
+                const img = new Image();
+                img.src = "https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png";
+            </script>
+            <img src="https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png" class="dilytics-logo">
+            """,
+            unsafe_allow_html=True
+        )
+
     # --- Main App Logic ---
     session = st.session_state.snowpark_session
     root = Root(session)
