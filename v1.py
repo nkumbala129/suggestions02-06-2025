@@ -114,8 +114,9 @@ st.markdown("""
     padding: 10px;
     text-align: center;
     pointer-events: none;
-    max-width: 100%; /* Adjusted header width */
-    margin: 0 auto; /* Center the header */
+    max-width: 80%;
+    margin: 0 auto;
+    height: 80px;
 }
 .fixed-header a {
     pointer-events: none !important;
@@ -124,7 +125,7 @@ st.markdown("""
     cursor: default !important;
 }
 .stApp {
-    padding-top: 150px;
+    padding-top: 120px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -162,7 +163,6 @@ def init_service_metadata():
 
 # --- Initialize Config Options ---
 def init_config_options():
-    # Move "Clear conversation" button outside the form
     st.sidebar.button("Clear conversation", key="clear_conversation_button", on_click=start_new_conversation)
     with st.sidebar.form(key="config_form"):
         st.toggle("Use chat history", key="use_chat_history", value=True)
@@ -319,7 +319,6 @@ else:
         st.markdown(
             f"""
             <script>
-                // Preload the image to avoid flickering
                 const img = new Image();
                 img.src = "https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png";
             </script>
@@ -522,6 +521,10 @@ else:
                 "Which requisitions have been pending approval for more than a week?"
             ]
 
+    # --- Display DataFrame ---
+    def display_dataframe(df: pd.DataFrame, key: str):
+        st.dataframe(df, use_container_width=True, key=key)
+
     # --- Display Chart Function ---
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
         if df.empty or len(df.columns) < 2:
@@ -540,28 +543,26 @@ else:
         x_col = col1.selectbox("X axis", all_cols, index=x_index, key=f"{prefix}_x")
         remaining_cols = [c for c in all_cols if c != x_col]
         default_y = st.session_state.get(f"{prefix}_y", remaining_cols[0] if remaining_cols else all_cols[0])
-        y_index = remaining_cols.index(default_y) if default_y in remaining_cols else 0
-        y_col = col2.selectbox("Y axis", remaining_cols, index=y_index, key=f"{prefix}_y")
-        chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
+        y_index = remaining_cols.index(default_y) if remaining_cols and default_y in remaining_cols else 0
+        y_col = col2.selectbox("Y axis", remaining_cols, index=y_index, key=f"{prefix}_y") if remaining_cols else None
+        chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart"]
         default_type = st.session_state.get(f"{prefix}_type", default_chart)
-        type_index = chart_options.index(default_type) if default_type in chart_options else chart_options.index(default_chart)
-        chart_type = col3.selectbox("Chart Type", chart_options, index=type_index, key=f"{prefix}_type")
-        chart_key = f"{prefix}_{chart_type}_{hash(query)}"
-        if chart_type == "Line Chart":
-            fig = px.line(df, x=x_col, y=y_col, title=chart_type)
-            st.plotly_chart(fig, key=chart_key)
-        elif chart_type == "Bar Chart":
-            fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
-            st.plotly_chart(fig, key=chart_key)
-        elif chart_type == "Pie Chart":
-            fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
-            st.plotly_chart(fig, key=chart_key)
-        elif chart_type == "Scatter Chart":
-            fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
-            st.plotly_chart(fig, key=chart_key)
-        elif chart_type == "Histogram Chart":
-            fig = px.histogram(df, x=x_col, title=chart_type)
-            st.plotly_chart(fig, key=chart_key)
+        type_index = chart_options.index(default_type) if default_type in chart_options else 0
+        chart_type = col3.selectbox("Chart Type", chart_options, index=type_index, key=f"{prefix}_chart_type")
+        chart_key = f"{prefix}_chart_{hash(query)}"
+        if y_col:  # Only render chart if y_col is valid
+            if chart_type == "Line Chart":
+                fig = px.line(df, x=x_col, y=y_col, title=chart_type)
+                st.plotly_chart(fig, key=chart_key, use_container_width=True)
+            elif chart_type == "Bar Chart":
+                fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
+                st.plotly_chart(fig, key=chart_key, use_container_width=True)
+            elif chart_type == "Pie Chart":
+                fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
+                st.plotly_chart(fig, key=chart_key, use_container_width=True)
+            elif chart_type == "Scatter Chart":
+                fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
+                st.plotly_chart(fig, key=chart_key, use_container_width=True)
 
     # --- Sidebar UI ---
     with st.sidebar:
@@ -608,8 +609,8 @@ else:
         st.markdown(
             """
             <div class="fixed-header">
-                <h1 style='color: #29B5E8; margin-bottom: 5px;'>   Cortex AI-Procurement Assistant by DiLytics</h1>
-                <p style='font-size: 16px; color: #333;'><strong>Welcome to Cortex AI. I am here to help with Dilytics Procurement Insights Solutions</strong></p>
+                <h1 style='color: #29B5E8; margin-bottom: 5px;'>Cortex AI-Procurement Assistant by DiLytics</h1>
+                <p style='font-size: 16px; color: #333;'><strong>Welcome to Cortex AI.</strong></p>
             </div>
             """,
             unsafe_allow_html=True
@@ -638,7 +639,7 @@ else:
                     with st.expander("View SQL Query", expanded=False):
                         st.code(message["sql"], language="sql")
                     st.write(f"Query Results ({len(message['results'])} rows):")
-                    st.dataframe(message["results"], key=f"df_{hash(message['content'])}")
+                    display_dataframe(message["results"], key=f"df_{hash(message['content'])}")
                     if not message["results"].empty and len(message["results"].columns) >= 2:
                         st.write("Visualization:")
                         display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
@@ -736,7 +737,7 @@ else:
                             with st.expander("View SQL Query", expanded=False):
                                 st.code(sql, language="sql")
                             st.write(f"Query Results ({len(results)} rows):")
-                            st.dataframe(results, key=f"df_{hash(query)}")
+                            display_dataframe(results, key=f"df_{hash(query)}")
                             if len(results.columns) >= 2:
                                 st.write("Visualization:")
                                 display_chart_tab(results, prefix=f"chart_{hash(query)}", query=query)
