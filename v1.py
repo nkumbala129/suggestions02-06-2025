@@ -83,17 +83,19 @@ st.markdown("""
 [data-testid="stChatMessage"] {
     opacity: 1 !important;
     background-color: transparent !important;
-    white-space: pre-wrap !important;
-    word-wrap: break-word !important;
-    overflow: hidden !important;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 8px;
 }
 [data-testid="stChatMessageContent"] {
     white-space: pre-wrap !important;
     word-wrap: break-word !important;
-    overflow: hidden !important;
+    overflow-wrap: break-word !important;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
+    font-size: 16px;
+    line-height: 1.5;
 }
 .copy-button, [data-testid="copy-button"], [title="Copy to clipboard"], [data-testid="stTextArea"] {
     display: none !important;
@@ -133,7 +135,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Stream Text Function ---
-def stream_text(text: str, chunk_size: int = 1, delay: float = 0.05):  # Increased delay for slower typing
+def stream_text(text: str, chunk_size: int = 1, delay: float = 0.05):
     for i in range(0, len(text), chunk_size):
         yield text[i:i + chunk_size]
         time.sleep(delay)
@@ -643,7 +645,8 @@ else:
     if st.session_state.chat_history:
         for message in st.session_state.chat_history[-10:]:
             with st.chat_message(message["role"]):
-                st.write_stream(stream_text(message["content"]))  # Use stream_text for all messages
+                # Use markdown to ensure proper text rendering
+                st.markdown(message["content"])
                 if message["role"] == "assistant" and "results" in message and message["results"] is not None:
                     with st.expander("View SQL Query", expanded=False):
                         st.code(message["sql"], language="sql")
@@ -661,7 +664,7 @@ else:
             query = sample
 
     if query:
-        st.session_state.welcome_displayed = False  # Ensure welcome message doesn't reappear
+        st.session_state.welcome_displayed = False
         st.session_state.chart_x_axis = None
         st.session_state.chart_y_axis = None
         st.session_state.chart_type = "Bar Chart"
@@ -681,7 +684,7 @@ else:
         st.session_state.chat_history.append({"role": "user", "content": original_query})
         st.session_state.messages.append({"role": "user", "content": original_query})
         with st.chat_message("user"):
-            st.write(original_query)
+            st.markdown(original_query)
         with st.chat_message("assistant"):
             with st.spinner("Generating Response..."):
                 is_structured = is_structured_query(query)
@@ -702,7 +705,7 @@ else:
                     for i, q in enumerate(selected_questions, 1):
                         response_content += f"{i}. {q}\n"
                     response_content += "\nFeel free to ask any of these or come up with your own related to procurement analytics!"
-                    st.write_stream(stream_text(response_content))
+                    st.markdown(response_content)
                     assistant_response["content"] = response_content
                     st.session_state.last_suggestions = selected_questions
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
@@ -711,7 +714,7 @@ else:
                     response = create_prompt(query)
                     if response:
                         response_content = response.strip()
-                        st.write_stream(stream_text(response_content))
+                        st.markdown(response_content)
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
@@ -723,7 +726,7 @@ else:
                     summary = summarize(query)
                     if summary:
                         response_content = summary.strip()
-                        st.write_stream(stream_text(response_content))
+                        st.markdown(response_content)
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
@@ -743,7 +746,7 @@ else:
                             if not summary:
                                 summary = "Unable to generate a natural language summary."
                             response_content = summary.strip()
-                            st.write_stream(stream_text(response_content))
+                            st.markdown(response_content)
                             with st.expander("View SQL Query", expanded=False):
                                 st.code(sql, language="sql")
                             st.write(f"Query Results ({len(results)} rows):")
@@ -781,10 +784,10 @@ else:
                         summary = create_prompt(query)
                         if summary:
                             response_content = summary.strip()
-                            st.write_stream(stream_text(response_content))
+                            st.markdown(response_content)
                         else:
                             response_content = summarize_unstructured_answer(raw_result).strip()
-                            st.write_stream(stream_text(response_content))
+                            st.markdown(response_content)
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
@@ -798,7 +801,7 @@ else:
                     for i, suggestion in enumerate(suggestions, 1):
                         response_content += f"{i}. {suggestion}\n"
                     response_content += "\nThese questions might help clarify your query. Feel free to try one or rephrase your question!"
-                    st.write_stream(stream_text(response_content))
+                    st.markdown(response_content)
                     assistant_response["content"] = response_content
                     st.session_state.last_suggestions = suggestions
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
