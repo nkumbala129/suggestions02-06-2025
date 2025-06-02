@@ -280,10 +280,10 @@ def create_prompt(user_question):
     else:
         prompt_context = query_cortex_search_service(user_question)
         chat_history = []
-    
+
     if not prompt_context.strip():
         return complete(st.session_state.model_name, user_question)
-    
+
     prompt = f"""
         [INST]
         You are a helpful AI chat assistant with RAG capabilities. When a user asks you a question,
@@ -293,7 +293,7 @@ def create_prompt(user_question):
         and directly relevant to the user's question.
 
         If the user asks a generic question which cannot be answered with the given context or chat_history,
-        just respond directly and concisely to the user's question using the LLM.
+        just respond directly and concisely to the user’s question using the LLM.
 
         <chat_history>
         {chat_history_str}
@@ -658,7 +658,6 @@ else:
         st.markdown("---")
         with sample_questions_container:
             with st.expander("Sample Questions", expanded=st.session_state.show_sample_questions):
-                # st.session_state.show_sample_questions = True
                 sample_questions = [
                     "What is DiLytics Procurement Insight Solution?",
                     "What are the key subject areas covered in the solution?",
@@ -675,7 +674,6 @@ else:
                         st.session_state.current_query = sample
         with history_container:
             with st.expander("History", expanded=st.session_state.show_history):
-                # st.session_state.show_history = True
                 st.markdown("### Recent Questions")
                 user_questions = get_user_questions(limit=10)
                 if not user_questions:
