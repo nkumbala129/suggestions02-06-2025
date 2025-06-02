@@ -73,6 +73,8 @@ if "use_chat_history" not in st.session_state:
     st.session_state.use_chat_history = True
 if "clear_conversation" not in st.session_state:
     st.session_state.clear_conversation = False
+if "welcome_displayed" not in st.session_state:
+    st.session_state.welcome_displayed = False
 
 # --- CSS Styling ---
 st.markdown("""
@@ -149,6 +151,7 @@ def start_new_conversation():
     st.session_state.chart_type = "Bar Chart"
     st.session_state.last_suggestions = []
     st.session_state.clear_conversation = False
+    st.session_state.welcome_displayed = False
 
 # --- Initialize Service Metadata ---
 @st.cache_data
@@ -618,6 +621,16 @@ else:
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
     init_service_metadata()
         
+    # Display welcome message only once, outside of chat history loop
+    if not st.session_state.welcome_displayed:
+        welcome_message = "Hi, I am your PBCS Assistant. I can help you explore data, insights and analytics on PBCS (Planning and Budgeting insight solution)."
+        with st.chat_message("assistant"):
+            st.markdown(welcome_message, unsafe_allow_html=True)
+        # Add to chat_history only if not already present
+        if not any(msg["content"] == welcome_message for msg in st.session_state.chat_history):
+            st.session_state.chat_history.append({"role": "assistant", "content": welcome_message})
+        st.session_state.welcome_displayed = True
+
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
         "What is DiLytics Procurement Insight Solution?",
