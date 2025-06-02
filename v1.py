@@ -167,8 +167,9 @@ def init_service_metadata():
 
 # --- Initialize Config Options ---
 def init_config_options():
+    # Move "Clear conversation" button outside the form
+    st.sidebar.button("Clear conversation", key="clear_conversation_button", on_click=start_new_conversation)
     with st.sidebar.form(key="config_form"):
-        st.button("Clear conversation", on_click=start_new_conversation)
         st.toggle("Use chat history", key="use_chat_history", value=True)
         with st.expander("Advanced options"):
             st.selectbox("Select model:", MODELS, key="model_name")
