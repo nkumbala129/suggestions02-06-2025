@@ -75,9 +75,6 @@ if "use_chat_history" not in st.session_state:
     st.session_state.use_chat_history = True
 if "clear_conversation" not in st.session_state:
     st.session_state.clear_conversation = False
-# Remove rerun_trigger to prevent flickering
-# if "rerun_trigger" not in st.session_state:
-#     st.session_state.rerun_trigger = False
 
 # --- CSS Styling ---
 st.markdown("""
@@ -95,7 +92,198 @@ st.markdown("""
     word-wrap: break-word !important;
     overflow: hidden !important;
     width: 100% !important;
-    max-width:  Snowflake Cortex AI")
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+.copy-button, [data-testid="copy-button"], [title="Copy to clipboard"], [data-testid="stTextArea"] {
+    display: none !important;
+}
+.dilytics-logo {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+    width: 150px;
+    height: auto;
+}
+.fixed-header {
+    position: fixed;
+    top: 0;
+    left: 20px;
+    right: 0;
+    z-index: 999;
+    background-color: #ffffff;
+    padding: 10px;
+    text-align: center;
+    pointer-events: none;
+}
+.fixed-header a {
+    pointer-events: none !important;
+    text-decoration: none !important;
+    color: inherit !important;
+    cursor: default !important;
+}
+.stApp {
+    padding-top: 100px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# --- Add Logo in the Main UI ---
+if st.session_state.authenticated:
+    st.markdown(
+        f'<img src="https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png" class="dilytics-logo">',
+        unsafe_allow_html=True
+    )
+
+# --- Stream Text Function ---
+def stream_text(text: str, chunk_size: int = 1, delay: float = 0.01):
+    for i in range(0, len(text), chunk_size):
+        yield text[i:i + chunk_size]
+        time.sleep(delay)
+
+# --- Start New Conversation ---
+def start_new_conversation():
+    st.session_state.chat_history = []
+    st.session_state.messages = []
+    st.session_state.current_query = None
+    st.session_state.current_results = None
+    st.session_state.current_sql = None
+    st.session_state.current_summary = None
+    st.session_state.chart_x_axis = None
+    st.session_state.chart_y_axis = None
+    st.session_state.chart_type = "Bar Chart"
+    st.session_state.last_suggestions = []
+    st.session_state.clear_conversation = False
+
+# --- Initialize Service Metadata ---
+def init_service_metadata():
+    st.session_state.service_metadata = [{"name": "PROC_SERVICE", "search_column": ""}]
+    st.session_state.selected_cortex_search_service = "PROC_SERVICE"
+    try:
+        svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE PROC_SERVICE;").collect()[0]["search_column"]
+        st.session_state.service_metadata = [{"name": "PROC_SERVICE", "search_column": svc_search_col}]
+    except Exception as e:
+        st.error(f"❌ Failed to verify PROC_SERVICE: {str(e)}. Using default configuration.")
+
+# --- Initialize Config Options ---
+def init_config_options():
+    st.sidebar.button("Clear conversation", on_click=start_new_conversation)
+    st.sidebar.toggle("Use chat history", key="use_chat_history", value=True)
+    with st.sidebar.expander("Advanced options"):
+        st.selectbox("Select model:", MODELS, key="model_name")
+        st.number_input(
+            "Select number of context chunks",
+            value=100,
+            key="num_retrieved_chunks",
+            min_value=1,
+            max_value=400
+        )
+        st.number_input(
+            "Select number of messages to use in chat history",
+            value=10,
+            key="num_chat_messages",
+            min_value=1,
+            max_value=100
+        )
+
+# --- Query Cortex Search Service ---
+def query_cortex_search_service(query):
+    try:
+        db, schema = session.get_current_database(), session.get_current_schema()
+        root = Root(session)
+        cortex_search_service = (
+            root.databases[db]
+            .schemas[schema]
+            .cortex_search_services["PROC_SERVICE"]
+        )
+        context_documents = cortex_search_service.search(
+            query, columns=[], limit=st.session_state.num_retrieved_chunks
+        )
+        results = context_documents.results
+        service_metadata = st.session_state.service_metadata
+        search_col = service_metadata[0]["search_column"]
+        context_str = ""
+        for i, r in enumerate(results):
+            context_str += f"Context document {i+1}: {r[search_col]} \n" + "\n"
+        return context_str
+    except Exception as e:
+        st.error(f"❌ Error querying Cortex Search service: {str(e)}")
+        return ""
+
+# --- Get Chat History ---
+def get_chat_history():
+    start_index = max(
+        0, len(st.session_state.chat_history) - st.session_state.num_chat_messages
+    )
+    return st.session_state.chat_history[start_index : len(st.session_state.chat_history) - 1]
+
+# --- Make Chat History Summary ---
+def make_chat_history_summary(chat_history, question):
+    chat_history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
+    prompt = f"""
+        [INST]
+        Based on the chat history below and the question, generate a query that extends the question
+        with the chat history provided. The query should be in natural language.
+        Answer with only the query. Do not add any explanation.
+
+        <chat_history>
+        {chat_history_str}
+        </chat_history>
+        <question>
+        {question}
+        </question>
+        [/INST]
+    """
+    summary = complete(st.session_state.model_name, prompt)
+    return summary
+
+# --- Create Prompt ---
+def create_prompt(user_question):
+    chat_history_str = ""
+    if st.session_state.use_chat_history:
+        chat_history = get_chat_history()
+        if chat_history:
+            question_summary = make_chat_history_summary(chat_history, user_question)
+            prompt_context = query_cortex_search_service(question_summary)
+            chat_history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
+        else:
+            prompt_context = query_cortex_search_service(user_question)
+    else:
+        prompt_context = query_cortex_search_service(user_question)
+        chat_history = []
+    
+    if not prompt_context.strip():
+        return complete(st.session_state.model_name, user_question)
+    
+    prompt = f"""
+        [INST]
+        You are a helpful AI chat assistant with RAG capabilities. When a user asks you a question,
+        you will also be given context provided between <context> and </context> tags. Use that context
+        with the user's chat history provided in the between <chat_history> and </chat_history> tags
+        to provide a summary that addresses the user's question. Ensure the answer is coherent, concise,
+        and directly relevant to the user's question.
+
+        If the user asks a generic question which cannot be answered with the given context or chat_history,
+        just respond directly and concisely to the user's question using the LLM.
+
+        <chat_history>
+        {chat_history_str}
+        </chat_history>
+        <context>
+        {prompt_context}
+        </context>
+        <question>
+        {user_question}
+        </question>
+        [/INST]
+        Answer:
+    """
+    return complete(st.session_state.model_name, prompt)
+
+# --- Authentication Logic ---
+if not st.session_state.authenticated:
+    st.title("Welcome to Snowflake Cortex AI")
     st.write("Please login to interact with your data")
     st.session_state.username = st.text_input("Enter Snowflake Username:", value=st.session_state.username)
     st.session_state.password = st.text_input("Enter Password:", type="password")
@@ -124,7 +312,6 @@ st.markdown("""
                 cur.execute("ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = TRUE")
             st.session_state.authenticated = True
             st.success("Authentication successful! Redirecting...")
-            # Use st.rerun() only for authentication to ensure proper session setup
             st.rerun()
         except Exception as e:
             st.error(f"Authentication failed: {e}")
@@ -132,11 +319,6 @@ else:
     # --- Main App Logic ---
     session = st.session_state.snowpark_session
     root = Root(session)
-
-    # Remove rerun_trigger check to prevent flickering
-    # if st.session_state.rerun_trigger:
-    #     st.session_state.rerun_trigger = False
-    #     st.rerun()
 
     # --- Run Snowflake Query ---
     def run_snowflake_query(query):
@@ -180,7 +362,7 @@ else:
     def is_greeting_query(query: str):
         greeting_patterns = [
             r'^\b(hello|hi|hey|greet)\b$',
-            r'^\b(hello|hi|hey|greet)\b\s.*$'
+            r'^\b(hello|hi|hey|greet)\b\\s.*$'
         ]
         return any(re.search(pattern, query.lower()) for pattern in greeting_patterns)
 
@@ -288,7 +470,7 @@ else:
 
     # --- Summarize Unstructured Answer ---
     def summarize_unstructured_answer(answer):
-        sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|")\s', answer)
+        sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|")\\s', answer)
         return "\n".join(f"- {sent.strip()}" for sent in sentences[:6])
 
     # --- Suggest Sample Questions ---
