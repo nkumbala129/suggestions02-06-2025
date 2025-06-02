@@ -114,7 +114,7 @@ st.markdown("""
     padding: 10px;
     text-align: center;
     pointer-events: none;
-    max-width: 50%; /* Adjusted header width */
+    max-width: 100%; /* Adjusted header width */
     margin: 0 auto; /* Center the header */
 }
 .fixed-header a {
