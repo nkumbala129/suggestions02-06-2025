@@ -129,13 +129,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Add Logo in the Main UI ---
-if st.session_state.authenticated:
-    st.markdown(
-        f'<img src="https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png" class="dilytics-logo">',
-        unsafe_allow_html=True
-    )
-
 # --- Stream Text Function ---
 def stream_text(text: str, chunk_size: int = 1, delay: float = 0.01):
     for i in range(0, len(text), chunk_size):
@@ -316,6 +309,13 @@ if not st.session_state.authenticated:
         except Exception as e:
             st.error(f"Authentication failed: {e}")
 else:
+    # --- Add Logo in the Main UI ---
+    # Moved to top of authenticated section to prevent flickering
+    st.markdown(
+        f'<img src="https://raw.githubusercontent.com/nkumbala129/30-05-2025/main/Dilytics_logo.png" class="dilytics-logo">',
+        unsafe_allow_html=True
+    )
+
     # --- Main App Logic ---
     session = st.session_state.snowpark_session
     root = Root(session)
@@ -626,12 +626,10 @@ else:
         "What are the top 5 suppliers based on purchase order amount?"
     ]
 
-    # Use a form to handle sample question submission and prevent flickering
-    with st.sidebar.form(key="sample_question_form"):
-        selected_sample = st.radio("Select a sample question:", sample_questions, key="selected_sample")
-        submit_button = st.form_submit_button("Ask this question")
-        if submit_button:
-            query = selected_sample
+    # Restore original button-based sample questions
+    for sample in sample_questions:
+        if st.sidebar.button(sample, key=f"sample_{sample}"):
+            query = sample
 
     # Display chat history with results and visualizations
     for message in st.session_state.chat_history:
