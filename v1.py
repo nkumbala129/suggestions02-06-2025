@@ -536,20 +536,20 @@ else:
                 return questions[:5]
             else:
                 return [
-                    "Which buyer has the most purchase orders submitted in the last month?",
-                    "What is the average time taken for PO approval by each buyer in the current fiscal year?",
+                    "Which requisition types consistently show higher rejection rates and what is the financial impact of those rejections?",
+                    "What is the total amount of requisitions that are currently in process but not yet approved or cancelled??",
                     "Which suppliers have the longest lead times for delivering goods after PO approval?",
-                    "What is the total value of purchase orders approved by each department in the last quarter?",
+                    "how many  requisitions that were submitted proactively (before their need-by date)?",
                     "Which requisitions have been pending approval for more than a week?"
                 ]
         except Exception as e:
             st.error(f"❌ Failed to generate sample questions: {str(e)}")
             return [
-                "Which buyer has the most purchase orders submitted in the last month?",
-                "What is the average time taken for PO approval by each buyer in the current fiscal year?",
-                "Which suppliers have the longest lead times for delivering goods after PO approval?",
-                "What is the total value of purchase orders approved by each department in the last quarter?",
-                "Which requisitions have been pending approval for more than a week?"
+                "provide me the logic for purchase orders",
+                "provide me the logic for approved amount",
+                "what is the logic is used to get the total purchase requisitions explain me in detailed according the oracle ebs tables?",
+                "provide me the top 10  organization names which contains the maximum total purchase order value.",
+                "Can you provide the number of requisitions categorized by their current status?"
             ]
 
     # --- Display Chart Function ---
@@ -659,14 +659,17 @@ else:
         with sample_questions_container:
             with st.expander("Sample Questions", expanded=st.session_state.show_sample_questions):
                 sample_questions = [
-                    "What is DiLytics Procurement Insight Solution?",
-                    "What are the key subject areas covered in the solution?",
-                    "Describe the key metrics tracked in the Purchase Requisition reports.",
-                    "Show total purchase order value by organization.",
-                    "Which supplier has the highest requisition amount?",
-                    "How many active purchase orders are there?",
-                    "Which supplier has the minimum and maximum PO delivery rate?",
-                    "Which buyer has the least and highest PO approval duration?",
+                    "how this assistant is going to help in business?",
+                    "what is the meaning of approved requisitions?",
+                    "provide me the logic for approved amount",
+                    "provide me the logic for purchase requisitions amount?",
+                    "who are  the top 10  organization which contains the maximum total purchase order value.",
+                    "How many requisitions have both rejected and approved lines within the same requisition header?",
+                    "Which requisition types consistently show higher rejection rates and what is the financial impact of those rejections?",
+                    "what is the total number of requisitions?",
+                    "Among all suppliers, which supplier had the highest number of rejected requisition lines?",
+                    "Can you provide the number of requisitions categorized by their current status?",
+                    "For each supplier, what is the average percentage of requisition quantity that is eventually cancelled or rejected?",
                     "What are the top 5 suppliers based on purchase order amount?"
                 ]
                 for sample in sample_questions:
