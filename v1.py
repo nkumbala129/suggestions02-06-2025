@@ -15,7 +15,7 @@ import time
 # --- Snowflake/Cortex Configuration ---
 # Define constants for Snowflake connection and Cortex API settings.
 # These specify the host, database, schema, API endpoint, and semantic model for procurement data.
-HOST = "HLGSIYM-COB42429.snowflakecomputing.com"
+HOST = "NKCGIBJ-MWB30724.snowflakecomputing.com"
 DATABASE = "AI"
 SCHEMA = "DWH_MART"
 API_ENDPOINT = "/api/v2/cortex/agent:run"
@@ -321,7 +321,7 @@ if not st.session_state.authenticated:
             conn = snowflake.connector.connect(
                 user=st.session_state.username,
                 password=st.session_state.password,
-                account="HLGSIYM-COB42429",
+                account="NKCGIBJ-MWB30724",
                 host=HOST,
                 port=443,
                 warehouse="COMPUTE_WH",
